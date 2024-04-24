@@ -27,6 +27,7 @@ const dataProps = [
   'alwaysShowSelectedOptionsLabel',
   'ariaLabelledby',
   'ariaLabelText',
+  'ariaLabelClearButtonText',
   'autoSelectFirstOption',
   'clearButtonText',
   'descriptionKey',
@@ -116,6 +117,7 @@ export class VirtualSelect {
     const clearButtonTooltip = this.getTooltipAttrText(this.clearButtonText);
     const ariaLabelledbyText = this.ariaLabelledby ? `aria-labelledby="${this.ariaLabelledby}"` : '';
     const ariaLabelText = this.ariaLabelText ? `aria-label="${this.ariaLabelText}"` : '';
+    const ariaLabelClearBtnTxt = this.ariaLabelClearButtonText ? `aria-label="${this.ariaLabelClearButtonText}"` : '';
     let isExpanded = false;
 
     if (this.additionalClasses) {
@@ -166,17 +168,14 @@ export class VirtualSelect {
       `<div id="vscomp-ele-wrapper-${uniqueId}" class="vscomp-ele-wrapper ${wrapperClasses}" tabindex="0"
         role="combobox" aria-haspopup="listbox" aria-controls="vscomp-dropbox-container-${uniqueId}"
         aria-expanded="${isExpanded}" ${ariaLabelledbyText} ${ariaLabelText}>
-        
         <input type="hidden" name="${this.name}" class="vscomp-hidden-input">
-
         <div class="vscomp-toggle-button">
           <div class="vscomp-value" ${valueTooltip}>
             ${this.placeholder}
           </div>
-
           <div class="vscomp-arrow"></div>
-
-          <div class="vscomp-clear-button toggle-button-child" ${clearButtonTooltip}>
+          <div class="vscomp-clear-button toggle-button-child" ${clearButtonTooltip} 
+          tabindex="0" ${ariaLabelClearBtnTxt}>
             <i class="vscomp-clear-icon"></i>
           </div>
         </div>
@@ -430,7 +429,7 @@ export class VirtualSelect {
     this.addEvent(document, 'click', 'onDocumentClick');
     this.addEvent(this.$allWrappers, 'keydown', 'onKeyDown');
     this.addEvent(this.$toggleButton, 'click', 'onToggleButtonClick');
-    this.addEvent(this.$clearButton, 'click', 'onClearButtonClick');
+    this.addEvent(this.$clearButton, 'click keydown', 'onClearButtonClick');
     this.addEvent(this.$dropboxContainer, 'click', 'onDropboxContainerClick');
     this.addEvent(this.$dropboxCloseButton, 'click', 'onDropboxCloseButtonClick');
     this.addEvent(this.$optionsContainer, 'scroll', 'onOptionsScroll');
@@ -465,7 +464,7 @@ export class VirtualSelect {
     this.removeEvent(document, 'click', 'onDocumentClick');
     this.removeEvent(this.$allWrappers, 'keydown', 'onKeyDown');
     this.removeEvent(this.$toggleButton, 'click', 'onToggleButtonClick');
-    this.removeEvent(this.$clearButton, 'click', 'onClearButtonClick');
+    this.removeEvent(this.$clearButton, 'click keydown', 'onClearButtonClick');
     this.removeEvent(this.$dropboxContainer, 'click', 'onDropboxContainerClick');
     this.removeEvent(this.$dropboxCloseButton, 'click', 'onDropboxCloseButtonClick');
     this.removeEvent(this.$optionsContainer, 'scroll', 'onOptionsScroll');
@@ -484,14 +483,14 @@ export class VirtualSelect {
 
     eventsArray.forEach((event) => {
       const eventsKey = `${method}-${event}`;
-      let callback = this.events[eventsKey];
+      const callback = this.events[eventsKey];
 
       if (callback) {
         DomUtils.removeEvent($ele, event, callback);
       }
     });
   }
-  
+
   onDocumentClick(e) {
     const $eleToKeepOpen = e.target.closest('.vscomp-wrapper');
 
@@ -573,8 +572,13 @@ export class VirtualSelect {
     }
   }
 
-  onClearButtonClick() {
-    this.reset();
+  onClearButtonClick(e) {
+    if (e.type === 'click') {
+      this.reset();
+    } else if (e.type === 'keydown' && (e.code === 'Enter' || e.code === 'Space')) {
+      e.stopPropagation();
+      this.reset();
+    }
   }
 
   onOptionsScroll() {
@@ -682,12 +686,11 @@ export class VirtualSelect {
     this.mutationObserver.observe(document.querySelector('body'), { childList: true, subtree: true });
   }
 
-  removeMutationObserver(){
+  removeMutationObserver() {
     this.mutationObserver.disconnect();
   }
 
   /** dom event methods - end */
-
   /** before event methods - start */
   beforeValueSet(isReset) {
     this.toggleAllOptionsClass(isReset ? false : undefined);
@@ -918,6 +921,8 @@ export class VirtualSelect {
     this.emptyValue = options.emptyValue;
     this.ariaLabelledby = options.ariaLabelledby;
     this.ariaLabelText = options.ariaLabelText;
+    this.ariaLabelClearButtonText = options.ariaLabelClearButtonText;
+
     this.maxWidth = options.maxWidth;
     this.searchDelay = options.searchDelay;
 
@@ -967,6 +972,7 @@ export class VirtualSelect {
       descriptionKey: 'description',
       aliasKey: 'alias',
       ariaLabelText: 'Options list',
+      ariaLabelClearButtonText: 'Clear button',
       optionsCount: 5,
       noOfDisplayValues: 50,
       optionHeight: '40px',
@@ -1416,7 +1422,7 @@ export class VirtualSelect {
     } else {
       this.updatePosition();
     }
-
+    this.setVisibleOptionsCount();
     DomUtils.removeClass(this.$allWrappers, 'server-searching');
   }
 
@@ -1469,11 +1475,14 @@ export class VirtualSelect {
     }
 
     this.visibleOptions = visibleOptions;
+    // update number of visible options
+    this.visibleOptionsCount = visibleOptions.length;
     this.renderOptions();
   }
 
   setOptionsPosition(startIndex) {
-    const top = (startIndex || this.getVisibleStartIndex()) * this.optionHeight;
+    // We use the parseInt to fix a Chrome issue when dealing with decimal pixels in translate3d
+    const top = parseInt((startIndex || this.getVisibleStartIndex()) * this.optionHeight);
     this.$options.style.transform = `translate3d(0, ${top}px, 0)`;
     DomUtils.setData(this.$options, 'top', top);
   }
@@ -1556,17 +1565,17 @@ export class VirtualSelect {
         selectedValuesCount += 1;
 
         if (showValueAsTags) {
-          const valueTooltipForTags = this.getTooltipAttrText(label, !(Utils.willTextOverflow($valueText.parentElement, label)), true);  
+          // Will cause text overflow in runtime and if so,the tooltip information is prepared
+          const valueTooltipForTags = Utils.willTextOverflow($valueText.parentElement, label)
+            ? this.getTooltipAttrText(label, false, true) : '';
 
           const valueTagHtml = `<span class="vscomp-value-tag" data-index="${d.index}" ${valueTooltipForTags}>
-              <span class="vscomp-value-tag-content">${label}</span>
-              <span class="vscomp-value-tag-clear-button">
-                <i class="vscomp-clear-icon"></i>
-              </span>
-            </span>`;
-
+                  <span class="vscomp-value-tag-content">${label}</span>
+                  <span class="vscomp-value-tag-clear-button">
+                    <i class="vscomp-clear-icon"></i>
+                  </span>
+                </span>`;
           valueTooltip.push(valueTagHtml);
-            
         } else {
           valueTooltip.push(label);
         }
@@ -1632,13 +1641,12 @@ export class VirtualSelect {
 
     if (!showValueAsTags) {
       DomUtils.setData($valueText, 'tooltip', tooltipText);
-    } 
+    }
 
     if (multiple) {
       if (!showValueAsTags) {
         DomUtils.setData($valueText, 'tooltipEllipsisOnly', selectedLength === 0);
-      } 
-      else {
+      } else {
         this.updatePosition();
       }
     }
@@ -2006,8 +2014,9 @@ export class VirtualSelect {
   }
 
   getTooltipAttrText(text, ellipsisOnly = false, allowHtml = false) {
+    const tootltipText = Utils.containsHTML(text) ? Utils.replaceDoubleQuotesWithHTML(text) : text;
     const data = {
-      'data-tooltip': text || '',
+      'data-tooltip': tootltipText || '',
       'data-tooltip-enter-delay': this.tooltipEnterDelay,
       'data-tooltip-z-index': this.zIndex,
       'data-tooltip-font-size': this.tooltipFontSize,
@@ -2332,7 +2341,10 @@ export class VirtualSelect {
 
     if (!isSilent) {
       DomUtils.dispatchEvent(this.$ele, 'afterClose');
-      this.focus();
+      // Only focus there are no pre-selected options or when selecting new options
+      if ((this.initialSelectedValue && this.initialSelectedValue.length === 0) || this.selectedValues.length > 0) {
+        this.focus();
+      }
     }
   }
 
@@ -2383,10 +2395,11 @@ export class VirtualSelect {
     const hasNoOptions = !this.options.length && !this.hasServerSearch;
 
     if ($ele) {
-      if (hasNoOptions) {
+      if (hasNoOptions && !this.allowNewOption) {
         DomUtils.setAttr($ele, 'disabled', '');
         this.$noOptions.focus();
       } else {
+        $ele.removeAttribute('disabled');
         $ele.focus();
       }
     } else {
@@ -2694,10 +2707,11 @@ export class VirtualSelect {
       isAllSelected = this.isAllOptionsSelected();
     }
 
-    /** when all options not selected, checking if all visible options selected 
+    /** When all options not selected, checking if all visible options selected
      *  Also, in a search mode, validate that we still have visible items
     */
-    if (!isAllSelected && this.selectAllOnlyVisible  && (this.searchValue !== '' && this.visibleOptionsCount > 0 || this.searchValue == '')) {
+    if (!isAllSelected && this.selectAllOnlyVisible &&
+      (this.searchValue !== '' && (this.visibleOptionsCount > 0 || this.searchValue === ''))) {
       isAllVisibleSelected = this.isAllOptionsSelected(true);
     }
 
@@ -2847,14 +2861,14 @@ export class VirtualSelect {
     }
   }
 
-  reset(formReset = false) {
+  reset(formReset = false, disableChangeEvent = false) {
     this.options.forEach((d) => {
       // eslint-disable-next-line no-param-reassign
       d.isSelected = false;
     });
 
     this.beforeValueSet(true);
-    this.setValue(null, { disableValidation: formReset });
+    this.setValue(null, { disableEvent: disableChangeEvent, disableValidation: formReset });
     this.afterValueSet();
 
     if (formReset) {
@@ -3292,8 +3306,8 @@ export class VirtualSelect {
     return !hasError;
   }
 
-  static reset() {
-    this.virtualSelect.reset();
+  static reset(formReset = false, disableChangeEvent = false) {
+    this.virtualSelect.reset(formReset, disableChangeEvent);
   }
 
   static setValueMethod(...params) {
