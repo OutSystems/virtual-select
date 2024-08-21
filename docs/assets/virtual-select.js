@@ -965,7 +965,11 @@ var VirtualSelect = /*#__PURE__*/function () {
       var method = keyDownMethodMapping[key];
       if (document.activeElement === this.$searchInput && e.shiftKey && key === 9) {
         e.preventDefault();
-        this.$dropboxContainerTop.focus();
+        if (this.keepAlwaysOpen) {
+          this.$dropboxContainerTop.focus();
+        } else {
+          this.closeDropbox();
+        }
         return;
       }
       if (document.activeElement === this.$searchInput && key === 9) {
@@ -974,9 +978,12 @@ var VirtualSelect = /*#__PURE__*/function () {
         return;
       }
       // Handle the Escape key when showing the dropdown as a popup, closing it
-      if (document.activeElement === this.$wrapper && (key === 27 || e.key === 'Escape') && this.showAsPopup) {
-        this.closeDropbox();
-        return;
+      if (key === 27 || e.key === 'Escape') {
+        var wrapper = this.showAsPopup ? this.$wrapper : this.$dropboxWrapper;
+        if ((document.activeElement === wrapper || wrapper.contains(document.activeElement)) && !this.keepAlwaysOpen) {
+          this.closeDropbox();
+          return;
+        }
       }
       if (method) {
         this[method](e);
@@ -2703,6 +2710,7 @@ var VirtualSelect = /*#__PURE__*/function () {
         DomUtils.setAria(this.$wrapper, 'expanded', false);
         DomUtils.setAria(this.$wrapper, 'activedescendant', '');
       }
+      this.$wrapper.focus();
       if (this.dropboxPopover && !isSilent) {
         this.dropboxPopover.hide();
       } else {
