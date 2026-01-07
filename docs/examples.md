@@ -424,6 +424,24 @@ VirtualSelect.init({
 });
 ```
 
+## Custom styling
+
+Use `additionalClasses`, `additionalDropboxClasses`, `additionalDropboxContainerClasses` and `additionalToggleButtonClasses` to customize the styling of your dropdown
+
+<div id="custom-styling-select"></div>
+
+```js
+VirtualSelect.init({
+  ...
+  additionalClasses: 'custom-wrapper',
+  additionalDropboxClasses: 'custom-dropbox',
+  additionalDropboxContainerClasses: 'custom-dropbox-container',
+  additionalToggleButtonClasses: 'custom-toggle-button',
+});
+```
+
+
+<!-- END -->
 <script>
   setTimeout(function() {
     initPageExamples();
