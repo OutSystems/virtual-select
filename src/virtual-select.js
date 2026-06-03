@@ -445,7 +445,12 @@ export class VirtualSelect {
 
   /** dom event methods - start */
   addEvents() {
-    this.addEvent(document, 'click', 'onDocumentClick');
+    /**
+     * Registered in the capture phase so outside-clicks are detected even when an inner
+     * handler stops propagation. The matching removeEvent MUST pass capture: true as well,
+     * otherwise the listener is never removed and leaks on every render/destroy cycle.
+     */
+    this.addEvent(document, 'click', 'onDocumentClick', true);
     this.addEvent(this.$allWrappers, 'keydown', 'onKeyDown');
     this.addEvent(this.$toggleButton, 'click', 'onToggleButtonClick');
     this.addEvent(this.$clearButton, 'click keydown', 'onClearButtonClick');
@@ -458,7 +463,7 @@ export class VirtualSelect {
     this.addMutationObserver();
   }
 
-  addEvent($ele, events, method) {
+  addEvent($ele, events, method, capture = false) {
     if (!$ele) {
       return;
     }
@@ -474,13 +479,14 @@ export class VirtualSelect {
         this.events[eventsKey] = callback;
       }
 
-      DomUtils.addEvent($ele, event, callback);
+      DomUtils.addEvent($ele, event, callback, capture);
     });
   }
 
   /** dom event methods - start */
   removeEvents() {
-    this.removeEvent(document, 'click', 'onDocumentClick');
+    /** capture: true MUST match addEvents, otherwise the document listener is never removed (memory leak) */
+    this.removeEvent(document, 'click', 'onDocumentClick', true);
     this.removeEvent(this.$allWrappers, 'keydown', 'onKeyDown');
     this.removeEvent(this.$toggleButton, 'click', 'onToggleButtonClick');
     this.removeEvent(this.$clearButton, 'click keydown', 'onClearButtonClick');
@@ -493,7 +499,7 @@ export class VirtualSelect {
     this.removeMutationObserver();
   }
 
-  removeEvent($ele, events, method) {
+  removeEvent($ele, events, method, capture = false) {
     if (!$ele) {
       return;
     }
@@ -505,7 +511,7 @@ export class VirtualSelect {
       const callback = this.events[eventsKey];
 
       if (callback) {
-        DomUtils.removeEvent($ele, event, callback);
+        DomUtils.removeEvent($ele, event, callback, capture);
       }
     });
   }

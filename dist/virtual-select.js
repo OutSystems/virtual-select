@@ -487,10 +487,12 @@ var DomUtils = /*#__PURE__*/function () {
      * @param {HTMLElement} $ele
      * @param {string} events
      * @param {Function} callback
+     * @param {boolean} [capture] - listener phase; must match the value used on removeEvent
      */
   }, {
     key: "addEvent",
     value: function addEvent($ele, events, callback) {
+      var capture = arguments.length > 3 && arguments[3] !== undefined ? arguments[3] : false;
       if (!$ele) {
         return;
       }
@@ -498,7 +500,9 @@ var DomUtils = /*#__PURE__*/function () {
       eventsArray.forEach(function (event) {
         var $eleArray = DomUtils.getElements($ele);
         $eleArray.forEach(function ($this) {
-          $this.addEventListener(event, callback);
+          $this.addEventListener(event, callback, {
+            capture: capture
+          });
         });
       });
     }
@@ -586,16 +590,20 @@ var DomUtils = /*#__PURE__*/function () {
     * @param {HTMLElement} $ele
     * @param {string} event
     * @param {Function} callback
+    * @param {boolean} [capture] - must match the value used on addEvent, otherwise the listener is NOT removed
     */
   }, {
     key: "removeEvent",
     value: function removeEvent($ele, event, callback) {
+      var capture = arguments.length > 3 && arguments[3] !== undefined ? arguments[3] : false;
       if (!$ele) {
         return;
       }
       var $eleArray = DomUtils.getElements($ele);
       $eleArray.forEach(function ($this) {
-        $this.removeEventListener(event, callback);
+        $this.removeEventListener(event, callback, {
+          capture: capture
+        });
       });
     }
   }]);
@@ -899,7 +907,12 @@ var VirtualSelect = /*#__PURE__*/function () {
   }, {
     key: "addEvents",
     value: function addEvents() {
-      this.addEvent(document, 'click', 'onDocumentClick');
+      /**
+       * Registered in the capture phase so outside-clicks are detected even when an inner
+       * handler stops propagation. The matching removeEvent MUST pass capture: true as well,
+       * otherwise the listener is never removed and leaks on every render/destroy cycle.
+       */
+      this.addEvent(document, 'click', 'onDocumentClick', true);
       this.addEvent(this.$allWrappers, 'keydown', 'onKeyDown');
       this.addEvent(this.$toggleButton, 'click', 'onToggleButtonClick');
       this.addEvent(this.$clearButton, 'click keydown', 'onClearButtonClick');
@@ -915,6 +928,7 @@ var VirtualSelect = /*#__PURE__*/function () {
     key: "addEvent",
     value: function addEvent($ele, events, method) {
       var _this2 = this;
+      var capture = arguments.length > 3 && arguments[3] !== undefined ? arguments[3] : false;
       if (!$ele) {
         return;
       }
@@ -926,7 +940,7 @@ var VirtualSelect = /*#__PURE__*/function () {
           callback = _this2[method].bind(_this2);
           _this2.events[eventsKey] = callback;
         }
-        DomUtils.addEvent($ele, event, callback);
+        DomUtils.addEvent($ele, event, callback, capture);
       });
     }
 
@@ -934,7 +948,8 @@ var VirtualSelect = /*#__PURE__*/function () {
   }, {
     key: "removeEvents",
     value: function removeEvents() {
-      this.removeEvent(document, 'click', 'onDocumentClick');
+      /** capture: true MUST match addEvents, otherwise the document listener is never removed (memory leak) */
+      this.removeEvent(document, 'click', 'onDocumentClick', true);
       this.removeEvent(this.$allWrappers, 'keydown', 'onKeyDown');
       this.removeEvent(this.$toggleButton, 'click', 'onToggleButtonClick');
       this.removeEvent(this.$clearButton, 'click keydown', 'onClearButtonClick');
@@ -950,6 +965,7 @@ var VirtualSelect = /*#__PURE__*/function () {
     key: "removeEvent",
     value: function removeEvent($ele, events, method) {
       var _this3 = this;
+      var capture = arguments.length > 3 && arguments[3] !== undefined ? arguments[3] : false;
       if (!$ele) {
         return;
       }
@@ -958,7 +974,7 @@ var VirtualSelect = /*#__PURE__*/function () {
         var eventsKey = "".concat(method, "-").concat(event);
         var callback = _this3.events[eventsKey];
         if (callback) {
-          DomUtils.removeEvent($ele, event, callback);
+          DomUtils.removeEvent($ele, event, callback, capture);
         }
       });
     }
@@ -2735,6 +2751,7 @@ var VirtualSelect = /*#__PURE__*/function () {
         DomUtils.setAria(this.$wrapper, 'expanded', false);
         DomUtils.setAria(this.$wrapper, 'activedescendant', '');
       }
+      this.$wrapper.focus();
       if (this.dropboxPopover && !isSilent) {
         this.dropboxPopover.hide();
       } else {
